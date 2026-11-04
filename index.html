@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Подача — AI-тренер для официантов по вашему меню | Трио</title>
+<meta name="description" content="Ежедневные пятиминутные тренировки для официантов, барменов и кальянщиков по меню заведения. Тренажёр «Гость», трек новичка, отчёт владельцу. 1 990 ₽/мес, 7 дней бесплатно.">
+<meta name="theme-color" content="#070605">
+<meta property="og:title" content="Подача — AI-тренер для официантов по вашему меню | Трио">
+<meta property="og:description" content="Ежедневные пятиминутные тренировки для официантов, барменов и кальянщиков по меню заведения. Тренажёр «Гость», трек новичка, отчёт владельцу. 1 990 ₽/мес, 7 дней бесплатно.">
+<meta property="og:type" content="website">
+<meta property="og:image" content="/media/og.jpg">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/fonts/fonts.css">
+<link rel="stylesheet" href="/css/site.css?v=14">
+<link rel="modulepreload" href="/vendor/three.module.min.js">
+</head>
+<body data-page="podacha" data-shape="1" data-x="2.4" data-palette="#ff8a3d,#ffd9a0,#ffb15c">
+<div class="bgimg" aria-hidden="true" style="--i:url(/media/s2.webp);--im:url(/media/s2_m.webp)"></div><canvas id="field" aria-hidden="true"></canvas><div class="vignette" aria-hidden="true"></div><div class="grain" aria-hidden="true"></div>
+<header class="top">
+  <a class="logo" href="https://trio-resto-egor12.vercel.app/" aria-label="Трио — на главную"><svg viewBox="0 0 40 40" aria-hidden="true"><defs><linearGradient id="lg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ffd9a0"/><stop offset=".6" stop-color="#e3b26a"/><stop offset="1" stop-color="#ff8a3d"/></linearGradient></defs><g fill="none" stroke="url(#lg)" stroke-width="2"><circle cx="14" cy="15" r="9"/><circle cx="26" cy="15" r="9"/><circle cx="20" cy="26" r="9"/></g></svg><span>Трио<small>сервисы для ресторана</small></span></a>
+  <button class="burger" aria-label="Меню" aria-expanded="false"><i></i></button>
+  <nav class="menu" aria-label="Сервисы"><a href="/" aria-current="page">Подача</a><a href="https://zhurnalka.vercel.app/">Журналка</a><a href="https://svodka-egor12.vercel.app/">Сводка</a><a href="/app/#/login">Войти</a><a class="cta-mini" href="https://trio-resto-egor12.vercel.app/trio">Пакет «Трио»</a></nav>
+</header>
+<main>
+
+<section class="p-hero c-podacha" data-shape="1" data-x="2.4">
+  <div class="wrap">
+    <div>
+      <div class="crumbs rv"><a href="https://trio-resto-egor12.vercel.app/">Трио</a><span>/</span><span>Подача</span></div>
+      <h1 class="split">Пять минут перед сменой — и официант <em>знает ваше меню</em></h1>
+      <p class="lead rv d2">AI-тренер для зала: ваше меню, барная и кальянная карта превращаются в ежедневные тренировки для команды. Состав, аллергены, разговор с AI-гостем, допуск новичков и отчёт владельцу каждый понедельник.</p>
+      <div class="btns rv d3"><a class="btn gold" href="/app/#/register">Зарегистрироваться — 7 дней бесплатно <span class="arr">→</span></a><a class="btn" href="#features">Что внутри</a></div>
+      <p class="note rv d4">1 990 ₽/мес за заведение · до 15 сотрудников · без установки приложений</p>
+    </div>
+    <div class="mock rv d2"><div class="scr">
+      <div class="bar1"><b>Подача</b><span>Смена 18:00</span></div>
+      <div class="tl">Разминка · 2/5</div>
+      <div class="q">Гость: «Я не переношу лактозу. Можно том ям?»</div>
+      <div class="opt">А · Нельзя, там молоко</div>
+      <div class="opt sel">Б · По техкарте — кокосовое молоко без лактозы. Если сомневаетесь — уточню на кухне</div>
+      <div class="opt">В · Можно, у нас всё без лактозы</div>
+      <div class="row" style="margin-top:14px"><span>Официант: Анна<small>новичок · день 5 из 7</small></span><b class="acc">+1 балл</b></div>
+    </div></div>
+  </div>
+</section>
+
+<section class="blk c-podacha" id="features" data-shape="1" data-x="-2.4" data-alpha="0.5">
+  <div class="wrap">
+    <div class="blk-head"><h2 class="split">Людей в зале не хватает, <em>а учить некому</em></h2><p class="lead rv">Новичка учит старший официант между столами. Меню знают поверхностно, допродаж нет, ошибка с аллергеном — риск для гостя и репутации.</p></div>
+    <div class="feat">
+      <div class="rv d1"><i>ЕЖЕДНЕВНО</i><b>Разминка перед сменой</b><p>Пять вопросов и одна ситуация по вашему меню. Ошибки возвращаются чаще, пока не закрепятся.</p></div>
+      <div class="rv d2"><i>РАЗ В НЕДЕЛЮ</i><b>Тренажёр «Гость»</b><p>AI играет аллергика, сомневающегося или недовольного гостя. После — разбор и балл.</p></div>
+      <div class="rv d3"><i>7 ДНЕЙ</i><b>Трек новичка</b><p>Меню, стандарты, три тренировки и итоговый допуск. Видно, кого уже ставить в зал.</p></div>
+      <div class="rv d1"><i>КАЛЬЯННЫЕ</i><b>Отдельный модуль</b><p>Табаки и чаши, контроль жара, разговор о крепости, безопасность и допродажа.</p></div>
+      <div class="rv d2"><i>ПН 10:00</i><b>Отчёт владельцу</b><p>Кто занимался, средний балл, слабые позиции меню, готовность новичков.</p></div>
+      <div class="rv d3"><i>БЕЗ ПРИЛОЖЕНИЙ</i><b>Всё в браузере</b><p>Сотрудник открывает ссылку или QR-код и пишет имя — ничего не нужно устанавливать.</p></div>
+    </div>
+  </div>
+</section>
+
+<section class="blk c-podacha" data-shape="1" data-x="2.6" data-alpha="0.45">
+  <div class="wrap">
+    <h2 class="split" style="margin-bottom:46px">Запуск <em>за 15 минут</em></h2>
+    <div class="steps">
+      <div class="rv"><b>Загружаете меню</b><p>PDF, фото или ссылка. Плюс барная и кальянная карта, стандарты, техкарты — что есть.</p></div>
+      <div class="rv"><b>Подтверждаете базу</b><p>Состав, аллергены, цены, сочетания. Без вашего подтверждения к команде ничего не уходит.</p></div>
+      <div class="rv"><b>Команда заходит по QR</b><p>Работает в браузере телефона: открыл ссылку, написал имя. Ничего не нужно устанавливать.</p></div>
+    </div>
+  </div>
+</section>
+
+
+<section class="blk c-podacha" id="agents" data-shape="1" data-x="-2.6" data-alpha="0.45">
+  <div class="wrap">
+    <div class="blk-head"><h2 class="split">Пять агентов <em>следят за обучением вместо вас</em></h2><p class="lead rv">Цифры считает сервис, а выводы и советы пишет ИИ (YandexGPT, данные остаются в России). Отчёты агентов — в кабинете и в Telegram, вопросы можно задавать обычным текстом. Внутри кабинета — пошаговая помощь: что нажать и куда, без звонков в поддержку.</p></div>
+    <div class="feat"><div class="rv d1"><i>🎯 АГЕНТ</i><b>Управляющий залом</b><p>По понедельникам — план на неделю: кого подтянуть, какие блюда разобрать на планёрке. Отвечает на вопросы в кабинете и в Telegram.</p></div><div class="rv d2"><i>📊 АГЕНТ</i><b>Аналитик обучения</b><p>Кто тренируется, кто пропал, растёт ли точность, готовы ли новички к самостоятельной смене.</p></div><div class="rv d3"><i>🧑‍🏫 АГЕНТ</i><b>Наставник</b><p>Личный план каждому сотруднику — он видит его прямо на главном экране приложения.</p></div><div class="rv d1"><i>📋 АГЕНТ</i><b>Меню-контроль</b><p>Находит в карточках неотмеченные аллергены, блюда без состава и без подсказок для допродажи.</p></div><div class="rv d2"><i>🗣 АГЕНТ</i><b>ИИ-гость</b><p>Живой диалог с «гостем» по вашему меню: вопросы о составе, аллергия, «что посоветуете?» — и разбор с оценкой.</p></div></div>
+  </div>
+</section>
+
+<section class="blk c-podacha" id="price" data-shape="1" data-x="0" data-alpha="0.35" data-scatter="0.6">
+  <div class="wrap">
+    <h2 class="split" style="text-align:center;margin-bottom:46px">Один тариф, <em>всё включено</em></h2>
+    <div class="tiers one"><div class="tier main rv d1"><span class="tn">Подача · 1 заведение</span><div class="tp">1 990<small> ₽/мес</small></div>
+<ul><li>До 15 сотрудников</li><li>Обучение по вашему меню</li><li>Разминка перед сменой каждый день</li><li>Тренажёр «Гость» — 4 в месяц на человека</li><li>Трек новичка, модули сервиса, бара и кальяна</li><li>Еженедельный отчёт владельцу</li></ul><a class="btn gold" href="/app/#/register?plan=base">Начать бесплатно <span class="arr">→</span></a></div></div>
+    <p class="small" style="text-align:center;margin-top:20px">Первые 7 дней бесплатно. За год — 19 900 ₽.</p>
+  </div>
+</section>
+<section class="blk"><div class="wrap"><div class="upsell rv">
+  <div><span class="eyebrow">Пакет «Трио»</span><h3 style="margin-top:14px">Зал, кухня и цифры — в одной подписке за <em>5 990 ₽/мес</em> вместо 7 970 ₽</h3><p>Подача входит в пакет вместе с двумя другими сервисами.</p></div>
+  <a class="btn gold" href="https://trio-resto-egor12.vercel.app/trio">Смотреть пакет <span class="arr">→</span></a></div></div></section>
+
+</main>
+<footer>
+  <div class="wrap fgrid">
+    <div><a class="logo" href="https://trio-resto-egor12.vercel.app/"><svg viewBox="0 0 40 40" aria-hidden="true"><defs><linearGradient id="lg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ffd9a0"/><stop offset=".6" stop-color="#e3b26a"/><stop offset="1" stop-color="#ff8a3d"/></linearGradient></defs><g fill="none" stroke="url(#lg)" stroke-width="2"><circle cx="14" cy="15" r="9"/><circle cx="26" cy="15" r="9"/><circle cx="20" cy="26" r="9"/></g></svg><span>Трио<small>сервисы для ресторана</small></span></a>
+      <p class="small" style="margin-top:18px;max-width:360px">Обучение персонала, санитарные журналы и отчёты из iiko для кафе, баров и ресторанов. 7 дней бесплатно в каждом сервисе.</p></div>
+    <div><h4>Сервисы</h4><a href="/">Подача — обучение зала</a><a href="https://zhurnalka.vercel.app/">Журналка — санжурналы</a><a href="https://svodka-egor12.vercel.app/">Сводка — отчёты из iiko</a><a href="https://trio-resto-egor12.vercel.app/trio">Пакет «Трио»</a></div>
+    <div><h4>Войти в кабинет</h4><a href="/app/#/login">Подача</a><a href="https://zhurnalka.vercel.app/app/#/login">Журналка</a><a href="https://svodka-egor12.vercel.app/app/#/login">Сводка</a></div>
+  </div>
+  <div class="wrap legal-links"><a href="mailto:dancekilla1999@gmail.com">dancekilla1999@gmail.com</a><a href="https://trio-resto-egor12.vercel.app/offer">Оферта</a><a href="https://trio-resto-egor12.vercel.app/privacy">Политика конфиденциальности</a><a href="https://trio-resto-egor12.vercel.app/consent">Согласие на обработку данных</a><a href="https://trio-resto-egor12.vercel.app/cookies">Cookies</a></div>
+  <div class="wrap small" style="margin-top:18px">© 2026 «Трио». iiko — товарный знак правообладателя; сервисы не аффилированы с iiko. Журналка помогает вести журналы, но не заменяет программу производственного контроля.</div>
+</footer>
+<script type="module" src="/js/main.js?v=14"></script>
+</body>
+</html>

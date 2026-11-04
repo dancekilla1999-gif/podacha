@@ -1,0 +1,51 @@
+/* «Трио» — экран агентов (Журналка, Подача). Использует переменные темы приложения и trio-skin.css. */
+.ag { display: grid; gap: 16px; }
+.ag > * { min-width: 0; }
+.ag-row { display: flex; gap: 10px; align-items: center; justify-content: space-between; flex-wrap: wrap; }
+.ag-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); gap: 14px; }
+.ag-grid > * { min-width: 0; }
+.ag-card { display: grid; gap: 10px; text-decoration: none; color: inherit; border-left: 4px solid var(--line); }
+.ag-card.ok { border-left-color: var(--good); } .ag-card.warn { border-left-color: var(--amber, #F2A900); } .ag-card.bad { border-left-color: var(--bad); }
+.ag-card:hover { border-color: var(--accent); }
+.ag-card h2 { font-size: 1.1rem; margin: 0; }
+.ag-head { display: flex; gap: 12px; align-items: flex-start; }
+.ag-ico { font-size: 1.6rem; line-height: 1; }
+.ag-body { display: grid; gap: 4px; }
+.ag-body p { margin: 0; }
+.ag-title { display: flex; gap: 8px; align-items: baseline; }
+.ag-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; flex: none; background: var(--good); margin-top: 6px; }
+.ag-dot.warn { background: var(--amber, #F2A900); } .ag-dot.bad { background: var(--bad); }
+.ag-brief { border-left: 4px solid var(--good); display: grid; gap: 10px; } .ag-brief.warn { border-left-color: var(--amber, #F2A900); } .ag-brief.bad { border-left-color: var(--bad); }
+.ag-text { white-space: pre-wrap; line-height: 1.6; }
+.ag-items { display: grid; gap: 8px; }
+.ag-item { display: flex; gap: 10px; align-items: flex-start; padding: 10px 14px; border-radius: 10px; background: var(--warn-bg); border: 1px solid var(--warn-line); }
+.ag-item.bad { background: var(--bad-bg, rgba(255,120,100,.1)); border-color: transparent; }
+.ag-item.ok { background: var(--good-bg, rgba(103,219,165,.1)); border-color: transparent; }
+.ag-chat { display: grid; gap: 12px; }
+.ag-log { display: flex; flex-direction: column; gap: 8px; max-height: 420px; overflow-y: auto; padding: 4px; }
+.ag-msg { max-width: 85%; padding: 10px 14px; border-radius: 14px; white-space: pre-wrap; line-height: 1.5; font-size: .95rem; }
+.ag-msg.user { align-self: flex-end; background: var(--accent); color: #140d05; border-bottom-right-radius: 4px; }
+.ag-msg.assistant { align-self: flex-start; background: var(--bg); border: 1px solid var(--line); border-bottom-left-radius: 4px; }
+.ag-msg.wait { color: var(--muted); }
+.ag-form { display: flex; gap: 8px; align-items: flex-end; }
+.ag-form textarea { flex: 1; resize: vertical; min-height: 48px; font: inherit; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); }
+.ag-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.ag-chip { font: inherit; font-size: .85rem; padding: 6px 12px; border-radius: 999px; border: 1px solid var(--line); background: transparent; color: var(--ink); cursor: pointer; }
+.ag-chip:hover { border-color: var(--accent); color: var(--accent); }
+.ag-tg { display: flex; gap: 14px; align-items: center; justify-content: space-between; flex-wrap: wrap; }
+.ag-tg p { margin: 4px 0 0; }
+.ag-tbl { max-width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.ag-tbl table { width: 100%; border-collapse: collapse; min-width: 480px; font-size: .92rem; }
+.ag-tbl th, .ag-tbl td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+.ag-tbl th { font-size: .78rem; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); font-weight: 600; }
+.ag-tbl .num { text-align: right; white-space: nowrap; }
+.ag-kpis { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 10px; }
+.ag-kpi { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 14px; display: grid; gap: 2px; }
+.ag-kpi b { font-size: 1.6rem; font-family: var(--display); }
+.ag-kpi span { font-size: .78rem; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
+.ag-up { color: var(--good); } .ag-down { color: var(--bad); }
+.tab-ai { font-weight: 700; }
+#ag-toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%) translateY(120px); background: var(--ink); color: var(--bg); padding: 10px 16px; border-radius: 10px; transition: transform .25s; z-index: 1000; max-width: 90vw; }
+#ag-toast.show { transform: translateX(-50%) translateY(0); } #ag-toast.bad { background: var(--bad); color: #fff; }
+@media (max-width: 640px) { .ag-msg { max-width: 95%; } }
+@media print { .ag-chat, .ag-tg { display: none !important; } }
