@@ -2,6 +2,8 @@
 const { rpc } = require('./sb');
 const { tgSend, moscowDay } = require('./common');
 const A = require('./agents');
+const K = require('./keeper');
+const ai = require('./ai');
 
 function dbFor(who) {
   return { op: (op, args) => who.token ? rpc('pd_agent', { p_token: who.token, p_op: op, p_args: args || {} })
@@ -15,8 +17,15 @@ function dot(l) { return l === 'bad' ? '🔴' : l === 'warn' ? '🟡' : '🟢'; 
 async function runAll(db, opts = {}) {
   const day = opts.day || moscowDay(-1);
   const weekly = opts.week === true || (opts.week !== false && A.dow(day) === 0);
+  let watch = null, promo = null;
+  try { watch = await K.watch(); } catch (e) { console.error('keeper', e.message); }
+  if (weekly) { try { promo = await K.promo('podacha', ai); } catch (e) { console.error('promo', e.message); } }
+  await Promise.all([save(db, watch), promo ? save(db, promo) : null]);
   const ctx = await db.op('ctx', { days: 7 });
-  if (!(ctx.venues || []).length) return { empty: true };
+  if (!(ctx.venues || []).length) {
+    if (opts.chatId && watch && watch.level === 'bad') await tgSend(opts.chatId, '<b>Смотритель</b>\n' + watch.items.filter((i) => i.level === 'bad').map((i) => '🔴 ' + esc(i.text)).join('\n')).catch(() => false);
+    return { empty: true, watch, promo };
+  }
   const mt = A.mentor(ctx, day), mc = A.menuCheck(ctx, day);
   await Promise.all([save(db, mt), save(db, mc)]);
   let week = null;
@@ -34,11 +43,13 @@ async function runAll(db, opts = {}) {
     const L = [`<b>Обучение команды · неделя ${esc(week.lead.data.period.label)}</b>`, '', esc(week.coach.title)];
     week.coach.items.slice(0, 6).forEach((i) => L.push(`${dot(i.level)} ${esc(i.text)}`));
     L.push(''); L.push('<b>🎯 Управляющий залом:</b>'); L.push(esc(week.lead.text));
+    if (promo) { L.push(''); L.push('<b>Продвижение:</b> черновик поста лежит в кабинете. Сам агент его не публикует.'); }
     if (link) { L.push(''); L.push(`<a href="${esc(link)}">Подробнее</a>`); }
     sent = await tgSend(opts.chatId, L.join('\n').slice(0, 4000)).catch(() => false);
+    if (watch && watch.level === 'bad') await tgSend(opts.chatId, '<b>Смотритель</b>\n' + watch.items.filter((i) => i.level === 'bad').map((i) => '🔴 ' + esc(i.text)).join('\n')).catch(() => false);
   } else if (opts.chatId && mc.items.some((i) => i.level === 'bad')) {
     sent = await tgSend(opts.chatId, '<b>Меню-контроль</b>\n' + mc.items.filter((i) => i.level === 'bad').slice(0, 3).map((i) => '🔴 ' + esc(i.text)).join('\n')).catch(() => false);
   }
-  return { mentor: mt, menu: mc, week, sent };
+  return { mentor: mt, menu: mc, week, sent, watch, promo };
 }
 module.exports = { dbFor, runAll, save };

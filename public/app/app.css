@@ -1,10 +1,16 @@
 /* «Подача» — приложение. Палитра как на лендинге: бутылочно-зелёный, латунь, бумага бегунка. */
 :root {
+  --bg: #0D1A15; --surface: #13241D; --ink: #E7EEE9; --muted: #A3B4AB; --line: #2A3F35;
+  --accent: #D2AE45; --accent-strong: #E4C463; --green: #173F31; --on-green: #E7EEE9;
+  --good: #4CC48A; --bad: #F07A6C; --warn-bg: #2B2612; --warn-line: #5C4D1E;
+  --display: "Prata", "Times New Roman", serif;
+  --body: "Golos Text", "Segoe UI", system-ui, -apple-system, sans-serif;
+  color-scheme: dark;
+}
+:root[data-theme="light"] {
   --bg: #F3F5F1; --surface: #FFFFFF; --ink: #12261E; --muted: #4E6158; --line: #CCD6CF;
   --accent: #8A6A12; --accent-strong: #6E540C; --green: #1D5A44; --on-green: #F3F5F1;
   --good: #1E7A4C; --bad: #B23A2E; --warn-bg: #FFF4D6; --warn-line: #E7CF8C;
-  --display: "Prata", "Times New Roman", serif;
-  --body: "Golos Text", "Segoe UI", system-ui, -apple-system, sans-serif;
   color-scheme: light;
 }
 @media (prefers-color-scheme: dark) {
