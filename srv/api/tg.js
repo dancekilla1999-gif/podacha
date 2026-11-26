@@ -6,21 +6,53 @@ const { dbFor } = require('../lib/pipeline');
 const A = require('../lib/agents');
 
 const HELP = 'Я — управляющий залом «Подачи». По понедельникам присылаю, как команда тренировалась, кто отстаёт и что подтянуть в меню.\n\n' +
-  'Спрашивайте: «кто не тренировался?», «какие блюда путают?», «готов ли новичок к смене?»\n\nКоманды: /team — обучение, /plan — план на неделю, /menu — проверка меню, /guest — ИИ-гость.';
+  'Спрашивайте: «кто не тренировался?», «какие блюда путают?», «готов ли новичок к смене?»\n\nКоманды: /team — обучение, /plan — план на неделю, /menu — проверка меню, /guest — ИИ-гость, /app — открыть кабинет.';
 const CMD = { '/team': 'coach', '/plan': 'lead', '/menu': 'menu_check', '/guest': 'guest', '/mentor': 'mentor' };
 function esc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
 
-module.exports = async function handler(req, res) {
+function expectedHookSecret() {
+  if (process.env.TELEGRAM_WEBHOOK_SECRET) return process.env.TELEGRAM_WEBHOOK_SECRET;
+  return hookSecret();
+}
+function hookOk(got) {
+  const want = expectedHookSecret();
+  if (!want || !got || Buffer.byteLength(got) !== Buffer.byteLength(want)) return false;
+  if (!process.env.TELEGRAM_WEBHOOK_SECRET && !process.env.CRON_SECRET) return false;
+  return crypto.timingSafeEqual(Buffer.from(got), Buffer.from(want));
+}
+function cabinetButton(req) {
+  return { reply_markup: { inline_keyboard: [[{ text: 'Открыть кабинет', web_app: { url: publicUrl(req) + '/tg/' } }]] } };
+}
+function classifyStart(text) {
+  const t = String(text || '').trim();
+  const hex = t.match(/^\/start\s+([a-f0-9]{18})$/i);
+  if (hex) return { type: 'report', code: hex[1].toLowerCase() };
+  if (/^\/start\s+l_/i.test(t)) return { type: 'mini_link' };
+  const cmd = t.split(/[\s@]/)[0].toLowerCase();
+  if (cmd === '/start' || cmd === '/app' || cmd === '/help') return { type: 'welcome' };
+  return { type: 'other', cmd };
+}
+
+async function handler(req, res) {
   if (req.method !== 'POST') return send(res, 405, { error: 'POST only' });
-  const got = String(req.headers['x-telegram-bot-api-secret-token'] || ''), want = hookSecret();
-  if (!process.env.CRON_SECRET || got.length !== want.length || !crypto.timingSafeEqual(Buffer.from(got), Buffer.from(want))) return send(res, 401, { error: 'unauthorized' });
+  const got = String(req.headers['x-telegram-bot-api-secret-token'] || '');
+  if (!hookOk(got)) return send(res, 401, { error: 'unauthorized' });
   const m = (await readBody(req)).message;
   if (!m || !m.chat) return send(res, 200, { ok: true });
   const text = String(m.text || '').trim(), secret = process.env.CRON_SECRET;
-  const code = (text.match(/^\/start\s+([a-f0-9]{18})$/i) || [])[1];
-  if (code) {
+  const kind = classifyStart(text);
+  if (kind.type === 'report') {
+    const code = kind.code;
     const r = await rpc('pd_agent_sys', { p_secret: secret, p_owner: null, p_op: 'tg_bind', p_args: { code: code.toLowerCase(), chat: m.chat.id, title: m.chat.title || [m.chat.first_name, m.chat.last_name].filter(Boolean).join(' ') } }).catch(() => ({ ok: false }));
-    await tgSend(m.chat.id, r.ok ? '✅ Готово! Чат подключён к «Подаче».\n\n' + HELP : 'Код не подошёл или устарел. Нажмите «Подключить Telegram» в кабинете ещё раз.');
+    await tgSend(m.chat.id, r.ok ? '✅ Готово! Чат подключён к «Подаче».\n\n' + HELP : 'Код не подошёл или устарел. Нажмите «Подключить Telegram» в кабинете ещё раз.', r.ok ? cabinetButton(req) : null);
+    return send(res, 200, { ok: true });
+  }
+  if (kind.type === 'mini_link') {
+    await tgSend(m.chat.id, 'Привязка аккаунта открывается в кабинете. Нажмите кнопку — код из ссылки подхватится сам. В чат почту и пароль отправлять не нужно.', cabinetButton(req));
+    return send(res, 200, { ok: true });
+  }
+  if (kind.type === 'welcome') {
+    await tgSend(m.chat.id, HELP, cabinetButton(req));
     return send(res, 200, { ok: true });
   }
   if (!text) return send(res, 200, { ok: true });
@@ -31,8 +63,7 @@ module.exports = async function handler(req, res) {
   const db = dbFor({ secret, owner: o.owner_id });
   const cmd = text.split(/[\s@]/)[0].toLowerCase();
   try {
-    if (cmd === '/help' || cmd === '/start') await tgSend(m.chat.id, HELP);
-    else if (CMD[cmd]) {
+    if (CMD[cmd]) {
       const i = await db.op('insight_get', { agent: CMD[cmd] }).catch(() => null);
       await tgSend(m.chat.id, i ? `<b>${esc(A.AGENTS[i.agent].name)} · ${esc(i.title)}</b>\n\n` + (i.agent === 'lead' ? esc(i.text) : (((i.data && i.data.items) || []).slice(0, 8).map((x) => (x.level === 'bad' ? '🔴 ' : x.level === 'warn' ? '🟡 ' : '🟢 ') + esc(x.text)).join('\n') || '✅ Замечаний нет')) + `\n\n<a href="${publicUrl(req)}/app/#/o/agents">Открыть в кабинете</a>` : 'Агент ещё не работал — подождите утреннего отчёта.');
     } else {
@@ -45,4 +76,7 @@ module.exports = async function handler(req, res) {
     }
   } catch (e) { await tgSend(m.chat.id, 'Не получилось ответить: ' + esc(String(e.message).slice(0, 200))); }
   return send(res, 200, { ok: true });
-};
+}
+
+handler.classifyStart = classifyStart;
+module.exports = handler;

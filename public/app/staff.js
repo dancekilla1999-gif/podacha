@@ -232,8 +232,7 @@
         h("h1", { text: "AI-тренер для зала" }),
         h("p", { class: "muted", text: "Ежедневные пятиминутные тренировки персонала по меню вашего заведения." }),
         h("div", { class: "choice" },
-          h("a", { class: "tile", href: "#/register" }, h("b", { text: "Я владелец или управляющий" }), h("span", { class: "muted small", text: "Загрузить меню, пригласить команду, смотреть отчёты" })),
-          h("a", { class: "tile", href: "#/login" }, h("b", { text: "Войти в кабинет" }), h("span", { class: "muted small", text: "У меня уже есть аккаунт" })),
+          h("a", { class: "tile", href: "#/login" }, h("b", { text: "Я владелец или управляющий" }), h("span", { class: "muted small", text: "Войти в кабинет. Новое заведение — только по приглашению." })),
           h("a", { class: "tile", href: "#/code" }, h("b", { text: "Я сотрудник" }), h("span", { class: "muted small", text: "У меня есть код приглашения" }))))));
   });
 

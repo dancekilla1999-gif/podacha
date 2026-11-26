@@ -1,0 +1,40 @@
+/* Тема Telegram поверх trio-skin. Светлая и тёмная приходят из themeParams.
+   Селектор длиннее, чем у trio-skin (там html:root[data-theme]), иначе тёмная палитра не отпускает. */
+html[data-tg="1"][data-theme],
+html[data-tg="1"][data-theme="light"],
+html[data-tg="1"][data-theme="dark"] {
+  --bg: var(--tg-theme-bg-color, #f3f5f1);
+  --surface: var(--tg-theme-secondary-bg-color, #ffffff);
+  --ink: var(--tg-theme-text-color, #14241c);
+  --muted: var(--tg-theme-hint-color, #5c6e64);
+  --line: color-mix(in srgb, var(--ink) 16%, transparent);
+  --accent: var(--tg-theme-link-color, #8a6a12);
+  --accent-strong: var(--tg-theme-button-color, #1d5a44);
+  --on-green: var(--tg-theme-button-text-color, #f4f6f4);
+  background: var(--bg);
+  color: var(--ink);
+}
+html[data-tg="1"] body {
+  background: var(--bg);
+  color: var(--ink);
+  min-height: var(--tg-viewport-stable-height, 100dvh);
+  padding-top: var(--tg-content-safe-area-inset-top, env(safe-area-inset-top, 0px));
+  padding-bottom: calc(var(--tg-safe-area-inset-bottom, env(safe-area-inset-bottom, 0px)) + 72px);
+  overflow-x: hidden;
+}
+html[data-tg="1"] body::after { display: none; }
+html[data-tg="1"] .topbar { top: var(--tg-content-safe-area-inset-top, 0px); background: var(--surface) !important; }
+html[data-tg="1"] .card,
+html[data-tg="1"] .topbar,
+html[data-tg="1"] input,
+html[data-tg="1"] select,
+html[data-tg="1"] textarea {
+  background: var(--surface);
+  color: var(--ink);
+}
+html[data-tg="1"] .btn.primary { background: var(--accent-strong); color: var(--on-green); filter: none; }
+.tg-gate, .tg-consent { display: grid; gap: 14px; }
+.tg-check { display: flex; gap: 10px; align-items: flex-start; }
+.tg-check input { width: 22px; height: 22px; margin-top: 2px; flex: none; }
+html[data-tg="1"] .tabs { overflow-x: auto; }
+html[data-tg="1"] .tabs a { white-space: nowrap; }

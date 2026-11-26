@@ -5,17 +5,23 @@
   var KIND = { cafe: "Кафе", bar: "Бар", hookah: "Кальянная / лаунж", restaurant: "Ресторан" };
   var MODULES = { service: "Сервис в зале", bar: "Бар", hookah: "Кальян" };
 
-  var S = { token: PD.store.get("pd_owner"), me: null };
+  var S = { token: null, me: null };
 
+  function tokenNow() { return (PD.auth && PD.auth.token()) || S.token; }
   function ownerApi(fn, args) {
-    return PD.api(fn, Object.assign({ p_token: S.token }, args || {})).catch(function (e) {
-      if (e.hint === "auth") { setToken(null); PD.toast(e.message, "bad"); PD.go("/login"); }
-      throw e;
-    });
+    var run = function () { return PD.api(fn, Object.assign({ p_token: tokenNow() }, args || {})); };
+    var p = PD.auth && PD.auth.withSession ? PD.auth.withSession(run) : run();
+    return p.then(function (r) { S.token = tokenNow(); return r; });
   }
-  function setToken(t) { S.token = t; S.me = null; PD.store.set("pd_owner", t); }
-  function fail(e) { if (e && e.hint !== "auth") PD.toast(e.message || "Ошибка", "bad"); }
-  PD.ownerToken = function () { return S.token; };
+  function setToken(t) {
+    S.token = t || null;
+    S.me = null;
+    if (PD.auth) PD.auth.setAccess(t);
+    if (!t) PD.store.set("pd_owner", null);
+  }
+  function fail(e) { if (e && e.hint !== "auth" && e.hint !== "disabled" && e.hint !== "revoked") PD.toast(e.message || "Ошибка", "bad"); }
+  PD.ownerToken = function () { return tokenNow(); };
+  PD.onAuth = function () { S.token = tokenNow(); };
 
   function loadMe(force) {
     if (S.me && !force) return Promise.resolve(S.me);
@@ -48,7 +54,7 @@
   }
 
   function withVenue(params, tab, render) {
-    if (!S.token) { PD.go("/login"); return; }
+    if (!tokenNow()) { PD.go("/login"); return; }
     PD.mount(PD.loading());
     loadMe(true).then(function () {
       var v = venueById(params.id);
@@ -60,8 +66,16 @@
   }
 
   // ------------------------------------------------------------ вход и регистрация
-  function authPage(mode) {
-    if (S.token) { PD.go("/o"); return; }
+  function authPage(mode, invite) {
+    if (tokenNow()) { PD.go("/o"); return; }
+    if (mode === "register" && !invite) {
+      PD.mount(h("main", { class: "page narrow" }, h("a", { class: "brand big", href: "#/", text: "Подача" }),
+        h("div", { class: "card" },
+          h("h1", { text: "Регистрация только по приглашению" }),
+          h("p", { class: "muted", text: "Публичной формы нет. Откройте одноразовую ссылку, которую вам прислали." }),
+          h("p", { class: "center" }, h("a", { class: "btn", href: "#/login", text: "Войти" })))));
+      return;
+    }
     var email = h("input", { type: "email", id: "email", autocomplete: "username", required: true, placeholder: "you@example.ru" });
     var pass = h("input", { type: "password", id: "password", autocomplete: mode === "login" ? "current-password" : "new-password", required: true, minlength: "8" });
     var name = h("input", { type: "text", id: "name", autocomplete: "name", placeholder: "Как к вам обращаться" });
@@ -73,32 +87,33 @@
       if (!email.value || !pass.value) { err.textContent = "Заполните почту и пароль"; return; }
       btn.disabled = true;
       var call = mode === "login"
-        ? PD.api("pd_owner_login", { p_email: email.value, p_password: pass.value })
-        : PD.api("pd_owner_register", { p_email: email.value, p_password: pass.value, p_name: name.value });
+        ? PD.auth.login(email.value, pass.value)
+        : PD.auth.register(email.value, pass.value, name.value, invite);
       call.then(function (r) {
         if (r && r.error) { err.textContent = r.error; btn.disabled = false; return; }
         setToken(r.token);
         PD.go("/o");
       }).catch(function (e2) { err.textContent = e2.message; btn.disabled = false; });
     } },
-      h("h1", { text: mode === "login" ? "Вход для владельца" : "Регистрация заведения" }),
-      h("p", { class: "muted", text: mode === "login" ? "Кабинет владельца или управляющего: меню, команда, отчёты." : "Две минуты — и можно загружать меню и приглашать команду." }),
+      h("h1", { text: mode === "login" ? "Вход для владельца" : "Регистрация по приглашению" }),
+      h("p", { class: "muted", text: mode === "login" ? "Кабинет владельца или управляющего: меню, команда, отчёты." : "Ссылка одноразовая. После регистрации вы сразу окажетесь в кабинете." }),
       mode === "register" ? h("label", { for: "name" }, "Имя", name) : null,
       h("label", { for: "email" }, "Почта", email),
       h("label", { for: "password" }, mode === "login" ? "Пароль" : "Пароль (от 8 символов)", pass),
       err, btn,
       h("p", { class: "muted small center" }, mode === "login"
-        ? ["Нет аккаунта? ", h("a", { href: "#/register", text: "Зарегистрироваться" })]
+        ? "Новое заведение подключается только по приглашению."
         : ["Уже есть аккаунт? ", h("a", { href: "#/login", text: "Войти" })]),
       h("p", { class: "muted small center" }, ["Вы сотрудник? Откройте ссылку-приглашение от управляющего или ", h("a", { href: "#/code", text: "введите код" })]));
     PD.mount(h("main", { class: "page narrow" }, h("a", { class: "brand big", href: "#/", text: "Подача" }), form));
   }
   PD.route("/login", function () { authPage("login"); });
-  PD.route("/register", function () { authPage("register"); });
+  PD.route("/register", function () { authPage("register", ""); });
+  PD.route("/register/:code", function (p) { authPage("register", p.code); });
 
   // ------------------------------------------------------------ список заведений / создание
   PD.route("/o", function () {
-    if (!S.token) { PD.go("/login"); return; }
+    if (!tokenNow()) { PD.go("/login"); return; }
     PD.mount(PD.loading());
     loadMe(true).then(function (me) {
       if (!me.venues.length) { PD.go("/o/new"); return; }
@@ -109,7 +124,7 @@
   });
 
   PD.route("/o/new", function () {
-    if (!S.token) { PD.go("/login"); return; }
+    if (!tokenNow()) { PD.go("/login"); return; }
     var name = h("input", { type: "text", id: "vname", required: true, maxlength: "80", placeholder: "Например, Смок Дог" });
     var kind = h("select", { id: "vkind" }, Object.keys(KIND).map(function (k) { return h("option", { value: k, text: KIND[k] }); }));
     var err = h("p", { class: "form-err", role: "alert" });
@@ -545,7 +560,7 @@
     var newp = h("input", { type: "password", id: "p-new", autocomplete: "new-password", minlength: "8" });
     body.appendChild(h("form", { class: "card form", onsubmit: function (e) {
       e.preventDefault();
-      ownerApi("pd_owner_password", { p_old: oldp.value, p_new: newp.value }).then(function () { PD.toast("Пароль изменён"); oldp.value = ""; newp.value = ""; }).catch(fail);
+      PD.auth.password(oldp.value, newp.value).then(function () { PD.toast("Пароль изменён"); oldp.value = ""; newp.value = ""; }).catch(fail);
     } },
       h("h2", { text: "Аккаунт" }),
       h("p", { class: "muted", text: "Вы вошли как " + (S.me ? S.me.email : "") }),
@@ -554,11 +569,97 @@
       h("div", { class: "row" },
         h("button", { class: "btn", type: "submit", text: "Сменить пароль" }),
         h("a", { class: "btn ghost", href: "#/o/new", text: "Добавить заведение" }),
-        h("button", { class: "btn ghost", type: "button", text: "Выйти", onclick: function () {
-          PD.api("pd_owner_logout", { p_token: S.token }).catch(function () {});
-          setToken(null); PD.go("/login");
+        h("button", { class: "btn ghost", type: "button", text: PD.tg ? "Выйти и отвязать Telegram" : "Выйти", onclick: function () {
+          var done = function () { setToken(null); PD.go(PD.tg ? "/login" : "/login"); };
+          var call = PD.tg ? PD.auth.unbind() : PD.auth.logout();
+          call.then(done, done);
+        } }),
+        h("button", { class: "btn ghost", type: "button", text: "Выйти на всех устройствах", onclick: function () {
+          PD.confirm("Выйти везде", "Сессии сайта и привязка Telegram будут завершены.", "Выйти везде", function () {
+            PD.auth.logoutAll().then(function () { setToken(null); PD.go("/login"); }, fail);
+          }, true);
         } }))));
-    body.appendChild(h("p", { class: "muted small", text: "Мы храним почту владельца, имена сотрудников и результаты тренировок. Данные пилота размещены у облачного провайдера Supabase (Франкфурт, ЕС)." }));
+    renderTelegram(body);
+    renderDevices(body);
+    if (PD.tg && PD.tg.tariffNode) body.appendChild(PD.tg.tariffNode());
+    body.appendChild(h("p", { class: "muted small", text: "Мы храним почту владельца, имена сотрудников и результаты тренировок. На этапе пилота база — Supabase (Франкфурт, ЕС), функции — Vercel. Переезд в РФ запланирован." }));
+  }
+
+  function renderTelegram(body) {
+    var box = h("div", { class: "card", id: "tg-bind" });
+    body.appendChild(box);
+    function drawIdle(info) {
+      box.textContent = "";
+      var linked = info && info.username;
+      box.appendChild(h("h2", { text: "Telegram" }));
+      if (linked) {
+        box.appendChild(h("p", { text: "Привязан Telegram @" + info.username + (info.dispute_open ? " — это вы?" : "") }));
+        if (info.dispute_open) {
+          box.appendChild(h("p", { class: "muted small", text: "Если привязку сделали не вы, отвяжите её. Предупреждение висит сутки." }));
+          box.appendChild(h("button", { class: "btn danger", type: "button", text: "Это не я", onclick: function () {
+            PD.auth.dispute().then(function () { PD.toast("Telegram отвязан"); drawIdle(null); }, fail);
+          } }));
+        }
+        return;
+      }
+      box.appendChild(h("p", { class: "muted", text: "Привяжите Telegram один раз — кабинет в боте будет открываться без пароля." }));
+      box.appendChild(h("button", { class: "btn primary", type: "button", text: "Привязать Telegram", onclick: function () {
+        PD.auth.linkCode().then(function (r) { showCode(r); }, fail);
+      } }));
+    }
+    function showCode(r) {
+      box.textContent = "";
+      box.appendChild(h("h2", { text: "Привязать Telegram" }));
+      box.appendChild(h("p", { class: "muted", text: "Откройте ссылку на телефоне, где вы вошли в Telegram. Код действует 10 минут и только один раз." }));
+      var link = h("a", { href: r.url, text: r.url });
+      box.appendChild(h("p", null, link));
+      if (PD.qrSvg) box.appendChild(PD.qrSvg(r.url, 180));
+      var status = h("p", { class: "muted", text: "Ждём подтверждения в Telegram…" });
+      box.appendChild(status);
+      var timer = setInterval(function () {
+        PD.auth.linkStatus(r.code).then(function (s) {
+          if (s.state === "linked") {
+            clearInterval(timer);
+            status.textContent = "Привязан Telegram @" + (s.username || "") + " — это вы?";
+            box.appendChild(h("button", { class: "btn danger", type: "button", text: "Это не я", onclick: function () {
+              PD.auth.dispute().then(function () { PD.toast("Telegram отвязан"); drawIdle(null); }, fail);
+            } }));
+          } else if (s.state === "expired") {
+            clearInterval(timer);
+            status.textContent = "Код истёк. Запросите новый.";
+          }
+        }, function () {});
+      }, 2000);
+    }
+    PD.auth.devices().then(function (d) { drawIdle(d && d.telegram); }, function () { drawIdle(null); });
+  }
+
+  function renderDevices(body) {
+    var box = h("div", { class: "card", id: "devices" });
+    body.appendChild(box);
+    function draw(data) {
+      box.textContent = "";
+      box.appendChild(h("h2", { text: "Устройства" }));
+      var list = (data && data.devices) || [];
+      if (!list.length) { box.appendChild(h("p", { class: "muted", text: "Активных сессий нет." })); return; }
+      list.forEach(function (d) {
+        var when = PD.fmtDate(d.created_at, true);
+        var seen = PD.fmtDate(d.last_used_at, true);
+        box.appendChild(h("div", { class: "device" },
+          h("div", null,
+            h("b", { text: d.label || (d.kind === "tg" ? "Telegram" : "Сайт") }),
+            d.current ? h("span", { class: "chip ok", text: "Это устройство" }) : null,
+            h("div", { class: "muted small", text: "Вход " + when + " · последний " + seen })),
+          h("button", { class: "btn small ghost", type: "button", text: "Завершить", onclick: function () {
+            PD.auth.endDevice(d.id).then(function () {
+              PD.toast(d.kind === "tg" ? "Telegram отвязан" : "Сессия завершена");
+              if (d.current) { setToken(null); PD.go("/login"); }
+              else PD.auth.devices().then(draw);
+            }, fail);
+          } })));
+      });
+    }
+    PD.auth.devices().then(draw, function () { draw({ devices: [] }); });
   }
 
   // ------------------------------------------------------------ пробная разминка владельца

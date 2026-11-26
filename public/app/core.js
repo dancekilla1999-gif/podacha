@@ -5,7 +5,7 @@
   var CFG = {
     url: "https://qozyihhlocvgpkchyqsp.supabase.co",
     key: "sb_publishable_Us9CgaJDpwIpAHSQYN7QMg_ADy35Uov",
-    xlsxLib: "https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"
+    xlsxLib: "/vendor/xlsx.full.min.js"
   };
   var C = window.PD_CONTENT;
   var PD = window.PD = { cfg: CFG };
@@ -21,7 +21,15 @@
   };
 
   // ------------------------------------------------------------ API
-  PD.api = function (fn, args) {
+  PD.offline = function (on) {
+    var el = document.getElementById("offline");
+    if (!on) { if (el) el.remove(); return; }
+    if (!el) {
+      el = h("div", { id: "offline", class: "offline", role: "status", text: "Нет связи" });
+      document.body.appendChild(el);
+    }
+  };
+  function apiOnce(fn, args) {
     var ctrl = typeof AbortController !== "undefined" ? new AbortController() : null;
     var timer = setTimeout(function () { if (ctrl) ctrl.abort(); }, 25000);
     return fetch(CFG.url + "/rest/v1/rpc/" + fn, {
@@ -38,8 +46,10 @@
           var err = new Error((data && data.message) || ("Ошибка сервера (" + r.status + ")"));
           err.hint = data && data.hint;
           err.status = r.status;
+          if (r.status >= 500) err.network = true;
           throw err;
         }
+        if (PD.offline) PD.offline(false);
         return data;
       });
     }, function (e) {
@@ -48,6 +58,19 @@
       err.network = true;
       throw err;
     });
+  }
+  PD.api = function (fn, args) {
+    function attempt(n) {
+      return apiOnce(fn, args).catch(function (e) {
+        if (n < 2 && (e.network || (e.status && e.status >= 500))) {
+          if (PD.offline) PD.offline(true);
+          return new Promise(function (res) { setTimeout(res, 400 * (n + 1)); }).then(function () { return attempt(n + 1); });
+        }
+        if (e.network && PD.offline) PD.offline(true);
+        throw e;
+      });
+    }
+    return attempt(0);
   };
 
   // ------------------------------------------------------------ DOM
