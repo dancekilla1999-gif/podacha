@@ -33,7 +33,7 @@ export TEST_DATABASE_URL=postgres://postgres:postgres@127.0.0.1:5432/podacha
 npm test
 ```
 
-Приглашение владельца (не на боевой базе): `PUBLIC_URL=... TG_SESSION_SECRET=... TEST_DATABASE_URL=... node scripts/owner-invite.js`
+Приглашение владельца выдаёт только платформенный админ с web-сессии (`platform_admin` или Telegram id из `ADMIN_TELEGRAM_IDS`). Роль в приглашении всегда `owner`. Скрипт: `OWNER_TOKEN=... ADMIN_TELEGRAM_IDS=... TG_SESSION_SECRET=... TEST_DATABASE_URL=... node scripts/owner-invite.js`
 
 Бот настраивается вручную, деплой сам Bot API не вызывает (`TG_SETUP` по умолчанию не равен `1`):
 
@@ -61,6 +61,7 @@ TG_SETUP=1 TG_BOT_TOKEN=... PUBLIC_URL=https://podacha-egor12.vercel.app TELEGRA
 | `SB_SERVICE_KEY` или `SUPABASE_SERVICE_ROLE_KEY` | сервисный ключ, только Production |
 | `PUBLIC_URL` | origin кабинета |
 | `ALERT_CHAT_ID` | служебный чат, в алерте только счётчики |
+| `ADMIN_TELEGRAM_IDS` | Telegram id платформенного админа через запятую; выдача приглашений |
 | `CRON_SECRET` | уже есть, для сессий не используется |
 | `TG_SETUP` | `1` только когда человек запускает `scripts/tg-setup.js` |
 

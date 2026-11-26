@@ -159,7 +159,7 @@
       if (!box.checked) return;
       loginBtn.disabled = true;
       post("/api/tg/login", { email: email, password: password, consent: true }).then(function (d) {
-        if (d && d.token) { rememberToken(d.token); enterCabinet(d.me); }
+        if (d && d.token) { if (d.plan) PD.tg.plan = d.plan; rememberToken(d.token); enterCabinet(d.me); }
       }, function (e) {
         err.textContent = e.message || "Не получилось войти";
         loginBtn.disabled = !box.checked;
@@ -169,7 +169,7 @@
       if (!code) return;
       btn.disabled = true;
       post("/api/tg/link", { code: code, consent: true }).then(function (d) {
-        if (d && d.token) { rememberToken(d.token); enterCabinet(d.me); }
+        if (d && d.token) { if (d.plan) PD.tg.plan = d.plan; rememberToken(d.token); enterCabinet(d.me); }
       }, function (e) { err.textContent = e.message || "Код не подошёл"; btn.disabled = false; });
     });
     var email = h("input", { type: "email", id: "tg-email", autocomplete: "username", placeholder: "you@example.ru" });

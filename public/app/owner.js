@@ -384,7 +384,8 @@
         var url = h("input", { type: "url", id: "menu-url", placeholder: "https://…/menu.json" });
         function load(u) {
           status.textContent = "Загружаю…";
-          fetch(u).then(function (r) { if (!r.ok) throw new Error(String(r.status)); return r.json(); })
+          var target = u.indexOf(location.origin) === 0 ? u : ("/api/menu-fetch?url=" + encodeURIComponent(u));
+          fetch(target).then(function (r) { if (!r.ok) throw new Error(String(r.status)); return r.json(); })
             .then(function (data) { setParsed(PD.parseJSONMenu(data, auto.checked), u.replace(/^https?:\/\//, "")); })
             .catch(function () { status.textContent = "Не удалось загрузить меню по ссылке. Нужен файл меню в формате JSON с разрешённым доступом. Можно скопировать меню с сайта текстом."; });
         }

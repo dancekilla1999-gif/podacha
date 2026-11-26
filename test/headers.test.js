@@ -25,8 +25,11 @@ function headersFor(urlPath) {
   return out;
 }
 
-test('регион функций — fra1', () => {
+test('регион функций — fra1, /tg без слэша уходит на /tg/', () => {
   assert.deepEqual(cfg.regions, ['fra1']);
+  const redir = (cfg.redirects || []).find((r) => r.source === '/tg');
+  assert.ok(redir);
+  assert.equal(redir.destination, '/tg/');
 });
 
 test('заголовки /tg/ и /app/ по vercel.json', async () => {

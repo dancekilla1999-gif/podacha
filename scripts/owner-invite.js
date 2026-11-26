@@ -9,7 +9,16 @@ if (!process.env.TG_SESSION_SECRET || !(process.env.TEST_DATABASE_URL || process
   process.exit(1);
 }
 const base = (process.env.PUBLIC_URL || 'https://podacha-egor12.vercel.app').replace(/\/+$/, '');
-db.service('pd_owner_invite_issue', { p_note: process.argv[2] || '', p_secret: process.env.TG_SESSION_SECRET })
+if (!process.env.OWNER_TOKEN) {
+  console.error('Инвайт выдаёт только платформенный админ с web-сессии (OWNER_TOKEN). Telegram-сессия не подходит. Роль в приглашении всегда owner.');
+  process.exit(1);
+}
+db.service('pd_owner_invite_issue', {
+  p_token: process.env.OWNER_TOKEN,
+  p_note: process.argv[2] || '',
+  p_admin_ids: process.env.ADMIN_TELEGRAM_IDS || '',
+  p_secret: process.env.TG_SESSION_SECRET
+})
   .then(function (row) {
     console.log(base + '/app/#/register/' + row.code);
     return db.close();

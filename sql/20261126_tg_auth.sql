@@ -13,6 +13,7 @@
 -- ---------------------------------------------------------------------------
 
 alter table app.owners add column if not exists disabled_at timestamptz;
+alter table app.owners add column if not exists platform_admin boolean not null default false;
 
 alter table app.owner_sessions add column if not exists id uuid;
 update app.owner_sessions set id = gen_random_uuid() where id is null;
@@ -162,6 +163,22 @@ create table if not exists app.owner_invites (
   expires_at timestamptz not null,
   used_at timestamptz,
   used_by uuid references app.owners (id)
+);
+
+alter table app.owner_invites add column if not exists role text not null default 'owner';
+
+do $do$
+begin
+  alter table app.owner_invites add constraint owner_invites_role_chk check (role = 'owner');
+exception when duplicate_object then null;
+end
+$do$;
+
+create table if not exists app.owner_plans (
+  owner_id uuid primary key references app.owners (id) on delete cascade,
+  name text not null default 'Подача',
+  status text not null default 'inactive',
+  until timestamptz
 );
 
 -- ---------------------------------------------------------------------------
@@ -314,6 +331,46 @@ begin
 end
 $fn$;
 
+-- План для Mini App: живой pd_plan, если он есть в базе, иначе app.owner_plans.
+create or replace function app.session_plan(p_owner uuid, p_token text)
+returns jsonb
+language plpgsql
+volatile
+security definer
+set search_path to pg_catalog
+as $fn$
+declare
+  v jsonb;
+begin
+  if exists (
+    select 1 from pg_proc p
+    join pg_namespace n on n.oid = p.pronamespace
+    where n.nspname = 'public' and p.proname = 'pd_plan'
+  ) then
+    begin
+      execute 'select public.pd_plan($1)' into v using p_token;
+    exception when others then
+      v := null;
+    end;
+  end if;
+  if v is not null and v <> 'null'::jsonb and coalesce(v->>'status', '') <> '' then
+    return v;
+  end if;
+  return coalesce(
+    (select jsonb_build_object(
+        'name', pl.name,
+        'status', pl.status,
+        'until', pl.until,
+        'paid_until', pl.until,
+        'active', pl.status in ('active', 'trial')
+      )
+      from app.owner_plans pl
+      where pl.owner_id = p_owner),
+    jsonb_build_object('name', 'Подача', 'status', 'inactive', 'active', false)
+  );
+end
+$fn$;
+
 -- VOLATILE: продление отдельно от owner_id.
 create or replace function app.session_touch(p_token text)
 returns void
@@ -378,6 +435,8 @@ begin
   if p_device_key is null or p_device_key !~ '^[0-9a-f]{64}$' then
     raise exception 'Нет устройства' using hint = 'invalid';
   end if;
+  -- одна транзакция на владельца: два параллельных входа не создадут шестую живую сессию
+  perform pg_advisory_xact_lock(hashtext('pd-tg-sess'), hashtext(p_owner::text));
   update app.owner_sessions
      set revoked_at = now(), revoke_reason = 'rotated', grace_cipher = null, grace_expires_at = null
    where owner_id = p_owner
@@ -511,8 +570,12 @@ declare
   v_family uuid;
 begin
   select * into o from app.owners where id = v_owner;
+  if app.hit_block_min('password', v_owner::text, 10, interval '15 minutes') > 0 then
+    return jsonb_build_object('error', 'Слишком много попыток, подождите 15 мин', 'status', 429);
+  end if;
   if o.pass_hash <> extensions.crypt(coalesce(p_old, ''), o.pass_hash) then
-    raise exception 'Старый пароль не подходит' using hint = 'invalid';
+    insert into app.rate_hits (bucket, subject) values ('password', v_owner::text);
+    return jsonb_build_object('error', 'Старый пароль не подходит', 'hint', 'invalid', 'status', 400);
   end if;
   if length(coalesce(p_new, '')) < 8 or length(p_new) > 72 then
     raise exception 'Пароль — от 8 до 72 символов' using hint = 'invalid';
@@ -642,7 +705,7 @@ begin
    where tg_user_id = p_tg_user_id;
   t := app.tg_issue(v_owner, p_tg_user_id, p_device_key, p_device_label, p_ip_hash);
   perform app.auth_event(v_owner, 'login_ok', p_tg_user_id, p_ip_hash, p_device_label);
-  return jsonb_build_object('token', t, 'me', app.owner_me_json(v_owner));
+  return jsonb_build_object('token', t, 'me', app.owner_me_json(v_owner), 'plan', app.session_plan(v_owner, t));
 end
 $fn$;
 
@@ -733,7 +796,7 @@ begin
 
   perform app.bind_tg(v_owner, p_tg_user_id, p_username, p_first_name, p_consent_version);
   t := app.tg_issue(v_owner, p_tg_user_id, p_device_key, p_device_label, p_ip_hash);
-  return jsonb_build_object('token', t, 'me', app.owner_me_json(v_owner));
+  return jsonb_build_object('token', t, 'me', app.owner_me_json(v_owner), 'plan', app.session_plan(v_owner, t));
 end
 $fn$;
 
@@ -804,7 +867,7 @@ begin
   perform app.bind_tg(o.id, p_tg_user_id, p_username, p_first_name, p_consent_version);
   t := app.tg_issue(o.id, p_tg_user_id, p_device_key, p_device_label, p_ip_hash);
   perform app.auth_event(o.id, 'login_ok', p_tg_user_id, p_ip_hash, p_device_label);
-  return jsonb_build_object('token', t, 'me', app.owner_me_json(o.id));
+  return jsonb_build_object('token', t, 'me', app.owner_me_json(o.id), 'plan', app.session_plan(o.id, t));
 end
 $fn$;
 
@@ -1104,7 +1167,8 @@ begin
     raise exception 'forbidden' using hint = 'forbidden';
   end if;
   select * into s from app.owner_sessions where token_hash = app.hash_token(p_token) for update;
-  if not found or s.token_role not in ('legacy', 'access') or s.kind = 'tg' then
+  -- обмен на годовой refresh только у старых токенов из localStorage, не у access и не у Telegram
+  if not found or s.token_role is distinct from 'legacy' or s.kind = 'tg' then
     return jsonb_build_object('hint', 'auth');
   end if;
   select disabled_at into v_disabled from app.owners where id = s.owner_id;
@@ -1243,22 +1307,48 @@ begin
 end
 $fn$;
 
-create or replace function public.pd_owner_invite_issue(p_note text, p_secret text)
-returns jsonb
+drop function if exists public.pd_owner_invite_issue(text, text);
+
+-- Инвайт выдаёт только платформенный админ и только с web-сессии.
+-- Роль в приглашении всегда owner: вызывающий её не выбирает.
+create or replace function public.pd_owner_invite_issue(
+  p_token text, p_note text, p_admin_ids text, p_secret text
+) returns jsonb
 language plpgsql
 security definer
 set search_path to pg_catalog
 as $fn$
 declare
+  v_owner uuid;
+  v_kind text;
+  v_role text;
+  v_admin boolean := false;
+  v_tg bigint;
   code text;
+  v_ids text := ',' || replace(coalesce(p_admin_ids, ''), ' ', '') || ',';
 begin
   if not app.secret_ok(p_secret) then
     raise exception 'forbidden' using hint = 'forbidden';
   end if;
+  if p_token is null or length(p_token) < 20 then
+    raise exception 'forbidden' using hint = 'forbidden';
+  end if;
+  v_owner := app.owner_id(p_token);
+  select kind, token_role into v_kind, v_role
+    from app.owner_sessions where token_hash = app.hash_token(p_token);
+  if v_kind = 'tg' or v_role = 'tg' then
+    raise exception 'forbidden' using hint = 'forbidden';
+  end if;
+  select platform_admin into v_admin from app.owners where id = v_owner;
+  select tg_user_id into v_tg from app.tg_links where owner_id = v_owner;
+  if coalesce(v_admin, false) is not true
+     and (v_tg is null or position(',' || v_tg::text || ',' in v_ids) = 0) then
+    raise exception 'forbidden' using hint = 'forbidden';
+  end if;
   code := rtrim(translate(encode(extensions.gen_random_bytes(16), 'base64'), '+/', '-_'), '=');
-  insert into app.owner_invites (code_hash, note, expires_at)
-  values (app.hash_token(code), left(coalesce(p_note, ''), 120), now() + interval '14 days');
-  return jsonb_build_object('code', code, 'expires_at', now() + interval '14 days');
+  insert into app.owner_invites (code_hash, note, expires_at, role)
+  values (app.hash_token(code), left(coalesce(p_note, ''), 120), now() + interval '14 days', 'owner');
+  return jsonb_build_object('code', code, 'role', 'owner', 'expires_at', now() + interval '14 days');
 end
 $fn$;
 
@@ -1342,5 +1432,11 @@ $do$;
 
 revoke all on all tables in schema app from public, anon, authenticated;
 revoke all on all sequences in schema app from public, anon, authenticated;
+revoke execute on all functions in schema app from public, anon, authenticated;
+alter default privileges in schema app revoke execute on functions from public;
+alter default privileges in schema app revoke execute on functions from anon;
+alter default privileges in schema app revoke execute on functions from authenticated;
+grant usage on schema app to service_role;
+grant execute on all functions in schema app to service_role;
 revoke all on schema app from public;
 grant usage on schema app to postgres;

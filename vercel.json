@@ -1,5 +1,6 @@
 {
   "regions": ["fra1"],
+  "redirects": [{ "source": "/tg", "destination": "/tg/", "permanent": false }],
   "crons": [{ "path": "/api/cron", "schedule": "20 3 * * *" }],
   "headers": [
     { "source": "/vendor/(.*)", "headers": [{ "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }] },

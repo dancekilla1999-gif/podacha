@@ -59,7 +59,12 @@ test.describe('кабинет и telegram', { concurrency: 1 }, () => {
     assert.match(no.json.error, /приглашен/);
     const bad = await invoke(auth.register, { body: { email: 'open@podacha.test', password: 'password-ok', invite: 'no-such-code-here-xxxxxx' } });
     assert.equal(bad.status, 403);
-    const issued = await db.service('pd_owner_invite_issue', { p_note: 'егор', p_secret: process.env.TG_SESSION_SECRET });
+    const issued = { code: crypto.randomBytes(16).toString('base64url') };
+    await sql(
+      `insert into app.owner_invites (code_hash, note, expires_at, role)
+       values (app.hash_token($1), 'егор', now() + interval '1 day', 'owner')`,
+      [issued.code]
+    );
     assert.equal(issued.code.length, 22);
     const hash = crypto.createHash('sha256').update(issued.code).digest('hex');
     const stored = await sql('select code_hash from app.owner_invites where code_hash = $1', [hash]);
@@ -503,6 +508,191 @@ test.describe('кабинет и telegram', { concurrency: 1 }, () => {
     assert.equal(JSON.stringify(res.json).includes(old), false);
     const bad = await invoke(tg.auth, { body: { initData: 'hash=abcd', device_key: dev('bad') }, headers: authHeaders('203.0.113.111') });
     assert.equal(bad.json.error, 'BAD_HASH');
+  });
+
+  test('повтор initData: перестановка и перекодирование — 401', async () => {
+    await makeUser('replay2@podacha.test');
+    const raw = signInitData({
+      auth_date: String(Math.floor(Date.now() / 1000)),
+      query_id: 'q-replay',
+      signature: 'sig-replay',
+      start_param: 'hello world',
+      user: JSON.stringify({ id: 9600, first_name: 'Егор', username: 'rundego', language_code: 'ru' })
+    }, process.env.TG_BOT_TOKEN);
+    seenInit.push(raw);
+    const first = await invoke(tg.login, {
+      body: { initData: raw, email: 'replay2@podacha.test', password: 'password-ok', consent: true, device_key: dev('replay-a') },
+      headers: authHeaders('203.0.113.120')
+    });
+    assert.equal(first.status, 200, JSON.stringify(first.json));
+    const sp = new URLSearchParams(raw);
+    const pairs = [...sp.entries()].reverse();
+    const reordered = pairs.map(([k, v]) => encodeURIComponent(k) + '=' + encodeURIComponent(v)).join('&');
+    const recoded = raw.replace(/\+/g, '%20');
+    assert.notEqual(reordered, raw);
+    assert.notEqual(recoded, raw);
+    const second = await invoke(tg.login, {
+      body: { initData: reordered, email: 'replay2@podacha.test', password: 'password-ok', consent: true, device_key: dev('replay-b') },
+      headers: authHeaders('203.0.113.121')
+    });
+    assert.equal(second.status, 401);
+    assert.equal(second.json.error, 'REPLAY');
+    const third = await invoke(tg.login, {
+      body: { initData: recoded, email: 'replay2@podacha.test', password: 'password-ok', consent: true, device_key: dev('replay-c') },
+      headers: authHeaders('203.0.113.122')
+    });
+    assert.equal(third.status, 401);
+    assert.equal(third.json.error, 'REPLAY');
+  });
+
+  test('migrate принимает только legacy', async () => {
+    const id = await makeUser('legacy@podacha.test');
+    const web = await webLogin('legacy@podacha.test', '203.0.113.130');
+    const asAccess = await invoke(auth.migrate, { body: { token: web.json.token }, headers: authHeaders('203.0.113.130') });
+    assert.equal(asAccess.status, 401);
+    const tgIn = await invoke(tg.login, {
+      body: { initData: initData(9700, 0), email: 'legacy@podacha.test', password: 'password-ok', consent: true, device_key: dev('mig-tg') },
+      headers: authHeaders('203.0.113.131')
+    });
+    assert.equal(tgIn.status, 200);
+    const asTg = await invoke(auth.migrate, { body: { token: tgIn.json.token }, headers: authHeaders('203.0.113.131') });
+    assert.equal(asTg.status, 401);
+    const legacy = 'legacy-token-value-0123456789abcdef';
+    await sql(
+      `insert into app.owner_sessions (token_hash, owner_id, expires_at, kind, token_role)
+       values (app.hash_token($1), $2::uuid, now() + interval '2 days', 'web', 'legacy')`,
+      [legacy, id]
+    );
+    const ok = await invoke(auth.migrate, { body: { token: legacy }, headers: authHeaders('203.0.113.132') });
+    assert.equal(ok.status, 200);
+    assert.ok(ok.json.token);
+    assert.match(ok.headers['set-cookie'], /pd_rt=/);
+  });
+
+  test('инвайт только у платформенного админа и не из Telegram', async () => {
+    const ownerId = await makeUser('plain@podacha.test');
+    const adminId = await makeUser('admin@podacha.test');
+    await sql('update app.owners set platform_admin = true where id = $1::uuid', [adminId]);
+    const plain = await webLogin('plain@podacha.test', '203.0.113.140');
+    const admin = await webLogin('admin@podacha.test', '203.0.113.141');
+    const stranger = await invoke(auth.invite, { body: { role: 'owner' }, headers: authHeaders('203.0.113.142') });
+    assert.equal(stranger.status, 403);
+    const asOwner = await invoke(auth.invite, {
+      body: { role: 'manager', note: 'хочу роль' },
+      headers: Object.assign(authHeaders('203.0.113.140'), { authorization: 'Bearer ' + plain.json.token })
+    });
+    assert.equal(asOwner.status, 403);
+    const tgIn = await invoke(tg.login, {
+      body: { initData: initData(9800, 0), email: 'admin@podacha.test', password: 'password-ok', consent: true, device_key: dev('admin-tg') },
+      headers: authHeaders('203.0.113.143')
+    });
+    assert.equal(tgIn.status, 200);
+    const asTg = await invoke(auth.invite, {
+      body: { role: 'manager' },
+      headers: Object.assign(authHeaders('203.0.113.143'), { authorization: 'Bearer ' + tgIn.json.token })
+    });
+    assert.equal(asTg.status, 403);
+    const issued = await invoke(auth.invite, {
+      body: { role: 'manager', note: 'егор' },
+      headers: Object.assign(authHeaders('203.0.113.141'), { authorization: 'Bearer ' + admin.json.token })
+    });
+    assert.equal(issued.status, 200, JSON.stringify(issued.json));
+    assert.equal(issued.json.role, 'owner');
+    const row = await sql('select role from app.owner_invites where code_hash = app.hash_token($1)', [issued.json.code]);
+    assert.equal(row.rows[0].role, 'owner');
+    const chain = await invoke(auth.register, {
+      body: { email: 'stranger@podacha.test', password: 'password-ok', name: 'Чужой', invite: 'not-a-real-invite-code' }
+    });
+    assert.equal(chain.status, 403);
+    const reg = await invoke(auth.register, {
+      body: { email: 'invited@podacha.test', password: 'password-ok', name: 'Гость', invite: issued.json.code, role: 'manager' },
+      headers: authHeaders('203.0.113.144')
+    });
+    assert.equal(reg.status, 200);
+    assert.equal((await sql('select platform_admin from app.owners where email = $1', ['invited@podacha.test'])).rows[0].platform_admin, false);
+    assert.equal(ownerId.length > 0, true);
+  });
+
+  test('план приходит в tg-сессию', async () => {
+    const id = await makeUser('plan@podacha.test');
+    await sql(
+      `insert into app.owner_plans (owner_id, name, status, until)
+       values ($1::uuid, 'Подача', 'active', '2026-01-12T12:00:00Z')`,
+      [id]
+    );
+    const res = await invoke(tg.login, {
+      body: { initData: initData(9900, 0), email: 'plan@podacha.test', password: 'password-ok', consent: true, device_key: dev('plan') },
+      headers: authHeaders('203.0.113.150')
+    });
+    assert.equal(res.status, 200, JSON.stringify(res.json));
+    assert.equal(res.json.plan.status, 'active');
+    assert.equal(res.json.plan.name, 'Подача');
+    assert.equal(res.json.plan.active, true);
+    const none = await makeUser('noplan@podacha.test');
+    const bare = await invoke(tg.login, {
+      body: { initData: initData(9901, 0), email: 'noplan@podacha.test', password: 'password-ok', consent: true, device_key: dev('noplan') },
+      headers: authHeaders('203.0.113.151')
+    });
+    assert.equal(bare.json.plan.status, 'inactive');
+    assert.equal(none.length > 0, true);
+  });
+
+  test('функции app закрыты от anon и открыты service_role', async () => {
+    const { Client } = require('pg');
+    async function asRole(role, q) {
+      const c = new Client({ connectionString: process.env.TEST_DATABASE_URL });
+      await c.connect();
+      try {
+        await c.query('begin');
+        await c.query('set local role ' + role);
+        await c.query(q);
+        await c.query('rollback');
+        return '';
+      } catch (e) {
+        try { await c.query('rollback'); } catch (ignore) {}
+        return e.code || '';
+      } finally {
+        await c.end();
+      }
+    }
+    assert.equal(await asRole('anon', `select app.hash_token('abc')`), '42501');
+    assert.equal(await asRole('anon', `select app.owner_id('xxxxxxxxxxxxxxxxxxxx')`), '42501');
+    assert.equal(await asRole('service_role', `select app.secret_ok('test-session-secret-value')`), '');
+  });
+
+  test('лимит неверного текущего пароля и гонка пяти tg-сессий', async () => {
+    await makeUser('pwdlock@podacha.test');
+    const web = await webLogin('pwdlock@podacha.test', '203.0.113.160');
+    for (let i = 0; i < 10; i++) {
+      const r = await invoke(auth.password, {
+        body: { current: 'wrong-pass', new: 'password-ok' },
+        headers: Object.assign(authHeaders('203.0.113.160'), { authorization: 'Bearer ' + web.json.token })
+      });
+      assert.equal(r.status, 400, String(i));
+    }
+    const blocked = await invoke(auth.password, {
+      body: { current: 'password-ok', new: 'password-zz' },
+      headers: Object.assign(authHeaders('203.0.113.160'), { authorization: 'Bearer ' + web.json.token })
+    });
+    assert.equal(blocked.status, 429);
+    assert.match(blocked.json.error, /подождите/);
+
+    await makeUser('race5@podacha.test');
+    const seed = await invoke(tg.login, {
+      body: { initData: initData(9950, 0), email: 'race5@podacha.test', password: 'password-ok', consent: true, device_key: dev('seed') },
+      headers: authHeaders('203.0.113.170')
+    });
+    assert.equal(seed.status, 200);
+    const burst = await Promise.all([1, 2, 3, 4, 5, 6, 7, 8].map((n) => invoke(tg.auth, {
+      body: { initData: initData(9950, 0), device_key: dev('race-' + n), device_label: 'D' + n },
+      headers: authHeaders('203.0.113.17' + n)
+    })));
+    assert.equal(burst.filter((r) => r.status === 200).length, 8);
+    const active = await sql(
+      `select count(*)::int as n from app.owner_sessions
+        where kind = 'tg' and tg_user_id = 9950 and revoked_at is null and expires_at > now()`
+    );
+    assert.ok(active.rows[0].n <= 5, String(active.rows[0].n));
   });
 
   test('в логах нет initData', () => {

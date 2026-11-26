@@ -20,7 +20,10 @@ function mapErr(e) {
   if (hint === 'invite') return { status: 403, body: { error: 'Регистрация только по приглашению', hint: 'invite' } };
   if (hint === 'invalid') return { status: 400, body: { error: e.message && e.message.length < 120 ? e.message : 'Проверьте данные', hint: 'invalid' } };
   if (hint === 'exists') return { status: 409, body: { error: 'Эта почта уже зарегистрирована — войдите', hint: 'exists' } };
-  if (hint === 'rate') return { status: 429, body: { error: 'Слишком много попыток, подождите 60 мин' } };
+  if (hint === 'rate') {
+    const msg = e && /подождите/.test(e.message || '') ? e.message : 'Слишком много попыток, подождите 15 мин';
+    return { status: 429, body: { error: msg } };
+  }
   if (hint === 'auth' || hint === 'expired' || hint === 'revoked') return { status: 401, body: { hint, error: 'Нужно войти' } };
   if (hint === 'denied' || hint === 'forbidden' || (e && e.code === '42501')) return { status: 403, body: { error: 'forbidden' } };
   if (hint === 'config') return { status: 503, body: { error: 'Вход временно недоступен' } };
@@ -192,6 +195,8 @@ async function password(req, res) {
     const row = await db.service('pd_owner_password', {
       p_token: token, p_old: String(body.current || ''), p_new: String(body.new || '')
     });
+    if (row && row.status === 429) return finish(res, 429, { error: row.error });
+    if (row && (row.hint === 'invalid' || row.status === 400)) return finish(res, 400, { error: row.error || 'Старый пароль не подходит', hint: 'invalid' });
     return finish(res, 200, row || { ok: true });
   } catch (e) {
     const m = mapErr(e);
@@ -265,6 +270,26 @@ async function linkStatus(req, res) {
   }
 }
 
+async function invite(req, res) {
+  if (!needPost(req, res)) return;
+  const token = web.bearer(req);
+  if (!token) return finish(res, 403, { error: 'forbidden' });
+  const body = await readBody(req);
+  try {
+    const row = await db.service('pd_owner_invite_issue', {
+      p_token: token,
+      p_note: String(body.note || '').slice(0, 120),
+      p_admin_ids: process.env.ADMIN_TELEGRAM_IDS || '',
+      p_secret: web.sessionSecret()
+    });
+    return finish(res, 200, { code: row.code, role: 'owner' });
+  } catch (e) {
+    const m = mapErr(e);
+    if (m.status === 429) return finish(res, 429, m.body);
+    return finish(res, 403, { error: 'forbidden' });
+  }
+}
+
 async function linkDispute(req, res) {
   if (!needPost(req, res)) return;
   const token = web.bearer(req);
@@ -279,5 +304,5 @@ async function linkDispute(req, res) {
 }
 
 module.exports = {
-  login, register, refresh, migrate, logout, logoutAll, password, devices, deviceEnd, linkCode, linkStatus, linkDispute
+  login, register, refresh, migrate, logout, logoutAll, password, devices, deviceEnd, linkCode, linkStatus, linkDispute, invite
 };

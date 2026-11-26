@@ -140,7 +140,7 @@ async function link(req, res) {
       p_device_label: web.cleanLabel(body.device_label) || 'Telegram',
       p_ip_hash: web.ipHash(web.clientIp(req)),
       p_code: code,
-      p_init_hash: web.sha256(String(body.initData || '')),
+      p_init_hash: String(v.hash || '').toLowerCase(),
       p_consent: true,
       p_consent_version: CONSENT_VERSION,
       p_secret: web.sessionSecret()
@@ -176,7 +176,7 @@ async function login(req, res) {
       p_ip_hash: web.ipHash(web.clientIp(req)),
       p_email: String(body.email || ''),
       p_password: String(body.password || ''),
-      p_init_hash: web.sha256(String(body.initData || '')),
+      p_init_hash: String(v.hash || '').toLowerCase(),
       p_consent: true,
       p_consent_version: CONSENT_VERSION,
       p_secret: web.sessionSecret()
