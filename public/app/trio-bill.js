@@ -34,6 +34,8 @@
   function sget(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
   function sset(k, v) { try { if (v == null) localStorage.removeItem(k); else localStorage.setItem(k, v); } catch (e) {} }
   function token() {
+    if (window.PD && window.PD.tg) return null;
+    if (window.PD && PD.auth && PD.auth.token()) return PD.auth.token();
     var v = sget(C.store); if (!v) return null;
     if (!C.field) return v;
     try { var o = JSON.parse(v); return o && o[C.field]; } catch (e) { return null; }

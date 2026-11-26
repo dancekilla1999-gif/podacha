@@ -12,7 +12,10 @@
 
   function sget(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
   function sset(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
-  function token() { var v = sget(STORE); if (!v) return null; if (!FIELD) return v; try { var o = JSON.parse(v); return o && o[FIELD]; } catch (e) { return null; } }
+  function token() {
+    if (window.PD && PD.auth && PD.auth.token()) return PD.auth.token();
+    var v = sget(STORE); if (!v) return null; if (!FIELD) return v; try { var o = JSON.parse(v); return o && o[FIELD]; } catch (e) { return null; }
+  }
   function rpc(fn, args) {
     return fetch(URL + "/rest/v1/rpc/" + fn, { method: "POST", headers: { apikey: KEY, "Content-Type": "application/json" }, body: JSON.stringify(args || {}) })
       .then(function (r) { return r.ok ? r.json() : null; }).catch(function () { return null; });
@@ -151,18 +154,8 @@
   };
   var C = G[P]; if (!C) return;
 
-  // ------------------------------------------------------------------ панель помощи
-  var css = ".tg-help{position:fixed;right:16px;bottom:16px;z-index:900;display:flex;align-items:center;gap:8px;padding:10px 14px;border-radius:999px;border:1px solid var(--line);background:var(--surface);color:var(--ink);font:inherit;font-weight:600;box-shadow:0 6px 24px rgba(0,0,0,.25);cursor:pointer}" +
-    ".tg-help b{display:inline-grid;place-items:center;width:22px;height:22px;border-radius:50%;background:var(--accent);color:#140d05;font-size:.8rem}.tg-help small{color:var(--muted);font-weight:500}" +
-    ".tg-panel{position:fixed;top:0;right:0;bottom:0;width:min(440px,100vw);z-index:950;background:var(--surface);color:var(--ink);border-left:1px solid var(--line);box-shadow:-10px 0 40px rgba(0,0,0,.35);display:flex;flex-direction:column;transform:translateX(105%);transition:transform .25s}" +
-    ".tg-panel.open{transform:none}.tg-ph{display:flex;justify-content:space-between;align-items:center;padding:16px 18px;border-bottom:1px solid var(--line)}.tg-ph h2{margin:0;font-size:1.15rem}" +
-    ".tg-pb{overflow-y:auto;padding:16px 18px;display:flex;flex-direction:column;gap:14px;flex:1;min-height:0}.tg-pb>*{flex:none}.tg-bar{height:8px;border-radius:99px;background:var(--line);overflow:hidden}.tg-bar i{display:block;height:100%;background:var(--good);transition:width .3s}" +
-    ".tg-step{border:1px solid var(--line);border-radius:12px;overflow:hidden}.tg-step summary{list-style:none;display:flex;gap:10px;align-items:center;padding:12px 14px;cursor:pointer;font-weight:600}.tg-step summary::-webkit-details-marker{display:none}" +
-    ".tg-n{flex:none;display:inline-grid;place-items:center;width:26px;height:26px;border-radius:50%;border:1px solid var(--line);font-size:.85rem}.tg-step.done .tg-n{background:var(--good);border-color:var(--good);color:#fff}.tg-step.done summary span:last-child{color:var(--muted);text-decoration:line-through}" +
-    ".tg-step ol{margin:0;padding:0 16px 10px 40px;display:grid;gap:6px;font-size:.92rem;line-height:1.5}.tg-step .tg-go{margin:0 14px 14px 40px}.tg-faq{border-top:1px solid var(--line);padding-top:12px;display:grid;gap:8px}.tg-faq details summary{cursor:pointer;font-weight:600;font-size:.95rem}.tg-faq p{margin:6px 0 0;font-size:.9rem;color:var(--muted)}" +
-    ".tg-tip{display:flex;gap:10px;align-items:flex-start;padding:10px 14px;border-radius:10px;border:1px dashed var(--line);font-size:.9rem;color:var(--muted);margin-bottom:12px}.tg-tip b{color:var(--accent);flex:none}.tg-tip button{margin-left:auto;background:none;border:0;color:var(--muted);font-size:1.1rem;cursor:pointer;line-height:1}" +
-    ".tg-other{display:grid;gap:6px;font-size:.9rem}.tg-other a{color:var(--accent)}@media print{.tg-help,.tg-panel,.tg-tip{display:none!important}}";
-  document.head.appendChild(el("style", { text: css }));
+  // стили — в guide.css (CSP кабинета не пускает inline style)
+  var tgMini = /^\/tg(\/|$)/.test(location.pathname) || !!(window.PD && window.PD.tg);
 
   var btn = el("button", { class: "tg-help", type: "button", "aria-label": "Помощь и инструкция", hidden: "hidden" }, el("b", { text: "?" }), el("span", { text: "Помощь" }), el("small", { class: "tg-prog" }));
   var body = el("div", { class: "tg-pb" });
@@ -196,21 +189,25 @@
       ctx = ctx || lastCtx || {};
       var p = progress(ctx), first = true;
       body.appendChild(el("p", { text: C.intro }));
-      body.appendChild(el("div", null, el("div", { class: "tg-bar" }, el("i", { style: "width:" + Math.round(p.done / p.total * 100) + "%" })), el("p", { class: "small muted", text: p.done === p.total ? "Всё настроено — отлично!" : "Готово " + p.done + " из " + p.total + ". Нажмите на шаг, чтобы увидеть инструкцию." })));
+      var bar = el("i");
+      bar.style.width = Math.round(p.done / p.total * 100) + "%";
+      body.appendChild(el("div", null, el("div", { class: "tg-bar" }, bar), el("p", { class: "small muted", text: p.done === p.total ? "Всё настроено — отлично!" : "Готово " + p.done + " из " + p.total + ". Нажмите на шаг, чтобы увидеть инструкцию." })));
       C.steps.forEach(function (s, i) {
         var ok = false; try { ok = s.done(ctx); } catch (e) { ok = false; }
         var go = typeof s.go === "function" ? s.go(ctx) : s.go;
         var d = el("details", { class: "tg-step" + (ok ? " done" : "") }, el("summary", null, el("span", { class: "tg-n", text: ok ? "✓" : String(i + 1) }), el("span", { text: s.title })),
           el("ol", null, s.how.map(function (x) { return el("li", { text: x }); })),
           el("div", { class: "tg-go" }, go ? el("a", { class: "btn small primary", href: go, onclick: close, text: "Перейти" }) : null,
-            s.manual && !ok ? el("button", { class: "btn small ghost", type: "button", style: "margin-left:8px", text: "Сделано", onclick: function () { sset("trio_guide_" + P + "_" + s.id, "1"); render(); } }) : null));
+            s.manual && !ok ? el("button", { class: "btn small ghost tg-gap", type: "button", text: "Сделано", onclick: function () { sset("trio_guide_" + P + "_" + s.id, "1"); render(); } }) : null));
         if (!ok && first) { d.open = true; first = false; }
         body.appendChild(d);
       });
       body.appendChild(el("div", { class: "tg-faq" }, el("h3", { text: "Частые вопросы" }), C.faq.map(function (f) { return el("details", null, el("summary", { text: f[0] }), el("p", { text: f[1] })); })));
-      body.appendChild(el("div", { class: "tg-other" }, el("h3", { text: "Пакет «Трио»" }), el("p", { class: "small muted", text: "У каждого сервиса свой кабинет — зарегистрируйтесь в каждом на ту же почту. Оплатить пакет со скидкой можно на сайте «Трио»." }),
-        Object.keys(LINKS).filter(function (k) { return k !== P; }).map(function (k) { return el("a", { href: LINKS[k], target: "_blank", rel: "noopener", text: NAMES[k] + " →" }); }),
-        el("a", { href: "https://trio-resto-egor12.vercel.app/trio", target: "_blank", rel: "noopener", text: "Пакет «Трио» — все три со скидкой →" })));
+      if (!tgMini) {
+        body.appendChild(el("div", { class: "tg-other" }, el("h3", { text: "Пакет «Трио»" }), el("p", { class: "small muted", text: "У каждого сервиса свой кабинет — зарегистрируйтесь в каждом на ту же почту. Оплатить пакет со скидкой можно на сайте «Трио»." }),
+          Object.keys(LINKS).filter(function (k) { return k !== P; }).map(function (k) { return el("a", { href: LINKS[k], target: "_blank", rel: "noopener", text: NAMES[k] + " →" }); }),
+          el("a", { href: "https://trio-resto-egor12.vercel.app/trio", target: "_blank", rel: "noopener", text: "Пакет «Трио» — все три со скидкой →" })));
+      }
     });
   }
 

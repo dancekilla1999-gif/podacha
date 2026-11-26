@@ -14,11 +14,12 @@ async function readBody(req) {
   try { return JSON.parse(Buffer.concat(chunks).toString('utf8') || '{}'); } catch (e) { return {}; }
 }
 function same(a, b) { const x = Buffer.from(String(a || '')), y = Buffer.from(String(b || '')); return x.length === y.length && crypto.timingSafeEqual(x, y); }
-async function tgSend(chatId, text) {
+async function tgSend(chatId, text, extra) {
   const tok = process.env.TG_BOT_TOKEN;
   if (!tok || !chatId) return false;
+  const payload = Object.assign({ chat_id: chatId, text, parse_mode: 'HTML', disable_web_page_preview: true }, extra || {});
   const r = await fetch(`https://api.telegram.org/bot${tok}/sendMessage`, { method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ chat_id: chatId, text, parse_mode: 'HTML', disable_web_page_preview: true }), signal: AbortSignal.timeout(15000) });
+    body: JSON.stringify(payload), signal: AbortSignal.timeout(15000) });
   return r.ok;
 }
 module.exports = { moscowDay, publicUrl, hookSecret, send, readBody, same, tgSend };
